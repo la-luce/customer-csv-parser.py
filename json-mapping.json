@@ -1,5 +1,4 @@
-  {
-
+{
     "os": "tagKeys/159558055953",
     "Customer Office": "tagKeys/281475275307367",
     "firebase": "tagKeys/281478465518025",
@@ -19,6 +18,5 @@
     "environment": "tagKeys/281484503265252",
     "shortName": "environment",
     "fisma_id": "tagKeys/32068405844",
-    "shielded": "tagKeys/624848186967"
-    
-  }
+    "shielded": "tagKeys/624848186967"  
+}

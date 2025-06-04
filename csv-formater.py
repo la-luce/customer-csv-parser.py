@@ -1,5 +1,8 @@
 import csv
 import io
+import argparse
+import json
+import sys
 
 def transform_csv_with_ids(input_csv_content, tag_name_to_id_mapping):
     """
@@ -33,7 +36,9 @@ def transform_csv_with_ids(input_csv_content, tag_name_to_id_mapping):
     # Validate that all headers from the CSV have a corresponding ID in the mapping
     missing_keys = [header for header in tag_name_headers if header.strip() and header not in tag_name_to_id_mapping]
     if missing_keys:
-        return f"Error: Missing ID mapping for the following Tag Names: {', '.join(missing_keys)}"
+        # Using sys.stderr to report errors is a good practice for command-line tools
+        sys.stderr.write(f"Error: Missing ID mapping for the following Tag Names: {', '.join(missing_keys)}\n")
+        return None
 
     output_rows = []
     # Add the header for the new output format, with 'metadata' as the last column
@@ -61,7 +66,8 @@ def transform_csv_with_ids(input_csv_content, tag_name_to_id_mapping):
         for i, tag_name in enumerate(tag_name_headers):
             if i < len(tag_values):
                 tag_value = tag_values[i]
-                if tag_value.strip(): # Only process if there is a value
+                # Check if the tag_name actually exists in our mapping before proceeding
+                if tag_value.strip() and tag_name in tag_name_to_id_mapping:
                     # Look up the tag ID from the mapping dictionary
                     tag_id = tag_name_to_id_mapping[tag_name]
                     # Append the new four-column row with metadata (project_number) at the end
@@ -74,55 +80,65 @@ def transform_csv_with_ids(input_csv_content, tag_name_to_id_mapping):
     
     return output_file.getvalue()
 
-# --- Example Usage ---
+def main():
+    """
+    Main function to run the script from the command line.
+    Parses arguments, reads files, calls the transformation function, and writes the output.
+    """
+    parser = argparse.ArgumentParser(
+        description="Transforms a CSV of project tags into a long format suitable for ingestion.",
+        formatter_class=argparse.RawTextHelpFormatter
+    )
+    parser.add_argument(
+        'input_csv',
+        help="Path to the input CSV file."
+    )
+    parser.add_argument(
+        'mapping_json',
+        help="Path to the JSON file containing the mapping of tag names to tag IDs."
+    )
+    parser.add_argument(
+        'output_csv',
+        help="Path for the output CSV file."
+    )
 
-# 1. First, you would run 'gcloud resource-manager tags keys list ...' in your
-#    terminal to get the mapping between display names and their IDs.
+    args = parser.parse_args()
 
-# 2. Populate this dictionary with your actual data.
-#    The key is the column header from your CSV (the display name).
-#    The value is the numeric ID from the 'name' field (e.g., the '123456789012' from 'tagKeys/123456789012').
-TAG_NAME_TO_ID_MAPPING = {
-    "Directorate in BQ": "111222333444",
-    "Project  in BQ": "222333444555",
-    "Shared in BQ": "333444555666",
-    "directorate": "444555666777",
-    "shared": "555666777888",
-    "firebase": "666777888999",
-    "environment": "777888999000",
-    "shielded": "888999000111",
-    "application-name": "999000111222",
-    "billing-account": "123123123123",
-    "UII | Investment code": "456456456456",
-    "Application Name": "789789789789",
-    "Sub-Application | Project Name": "987987987987",
-    "FISMA ID": "654654654654",
-    "OIT Executing Office": "321321321321",
-    "Customer Office": "112233445566",
-    "Funding Office": "778899001122",
-    "Gov Lead": "334455667788",
-    "Funding Status": "998877665544",
-    "Funding Source": "113355779900"
-    # ... add all of your other mappings here
-}
+    # --- Read Input Files ---
+    try:
+        with open(args.input_csv, 'r', encoding='utf-8') as f:
+            input_csv_content = f.read()
+    except FileNotFoundError:
+        sys.stderr.write(f"Error: Input file not found at '{args.input_csv}'\n")
+        sys.exit(1)
 
+    try:
+        with open(args.mapping_json, 'r', encoding='utf-8') as f:
+            tag_name_to_id_mapping = json.load(f)
+    except FileNotFoundError:
+        sys.stderr.write(f"Error: Mapping file not found at '{args.mapping_json}'\n")
+        sys.exit(1)
+    except json.JSONDecodeError:
+        sys.stderr.write(f"Error: Could not parse the JSON mapping file. Please check its format.\n")
+        sys.exit(1)
 
-# 3. Get the content of your CSV file into a string variable.
-#    (This part would be replaced by actually reading your file)
-# input_csv_string = """project_number,Directorate in BQ,environment
-# 346380439549,TASPD,dev
-# 1098178225458,CTO,prd
-# """
+    # --- Transform Data ---
+    print("Starting CSV transformation...")
+    transformed_data = transform_csv_with_ids(input_csv_content, tag_name_to_id_mapping)
+    
+    # --- Write Output File ---
+    if transformed_data:
+        try:
+            with open(args.output_csv, 'w', encoding='utf-8', newline='') as f:
+                f.write(transformed_data)
+            print(f"Transformation complete. Output written to '{args.output_csv}'")
+        except IOError as e:
+            sys.stderr.write(f"Error writing to output file '{args.output_csv}': {e}\n")
+            sys.exit(1)
+    else:
+        sys.stderr.write("Transformation failed. Please check the error messages above.\n")
+        sys.exit(1)
 
-# 4. Call the function with the CSV content and the mapping.
-# transformed_data_with_ids = transform_csv_with_ids(input_csv_string, TAG_NAME_TO_ID_MAPPING)
-
-# 5. Print the result. The output now has the 'metadata' column at the end.
-# print("--- Transformed CSV with Metadata Column Last ---")
-# print(transformed_data_with_ids)
-# Expected output:
-# tagkey_id,tagkey_name,tagvalue,metadata
-# 111222333444,Directorate in BQ,TASPD,346380439549
-# 777888999000,environment,dev,346380439549
-# 111222333444,Directorate in BQ,CTO,1098178225458
-# 777888999000,environment,prd,1098178225458
+# This block makes the script executable from the command line
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,24 @@
+  {
+
+    "os": "tagKeys/159558055953",
+    "Customer Office": "tagKeys/281475275307367",
+    "firebase": "tagKeys/281478465518025",
+    "unix": "tagKeys/281478598761554",
+    "billing-account": "tagKeys/281478721620003",
+    "FISMA ID": "tagKeys/281480450712183",
+    "OIT Executing Office": "tagKeys/281480917055771",
+    "Application Name": "tagKeys/281481687972058",
+    "Funding Status": "tagKeys/281481873768610",
+    "Funding Source": "tagKeys/281482128535527",
+    "shared": "tagKeys/281482237162670",
+    "Directorate in BQ": "tagKeys/281482465390425",
+    "Gov Lead": "tagKeys/281482717853819",
+   "application-name": "tagKeys/281483464753371",
+    "Directorate": "tagKeys/281483803802270",
+    "Funding Office": "tagKeys/281484272356536",
+    "environment": "tagKeys/281484503265252",
+    "shortName": "environment",
+    "fisma_id": "tagKeys/32068405844",
+    "shielded": "tagKeys/624848186967"
+    
+  }

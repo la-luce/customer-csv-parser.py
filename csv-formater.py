@@ -3,11 +3,11 @@ import io
 import json
 import sys
 
-# This is the core transformation function. It remains the same.
+# This is the core transformation function.
 def transform_csv_with_ids(input_csv_content, tag_name_to_id_mapping):
     """
     Transforms CSV data into a four-column format for readability:
-    tagkey_id, tagkey_name, tagvalue, metadata.
+    tagkey_id_number, tagkey_name, tagvalue_short_name, project_number.
 
     Args:
         input_csv_content (str): A string containing the content of the input CSV.
@@ -34,7 +34,8 @@ def transform_csv_with_ids(input_csv_content, tag_name_to_id_mapping):
         return None
 
     output_rows = []
-    output_rows.append(['tagkey_id', 'tagkey_name', 'tagvalue', 'metadata'])
+    # Set the new header row as requested
+    output_rows.append(['tagkey_id_number', 'tagkey_name', 'tagvalue_short_name', 'project_number'])
 
     # Rewind the file-like object to read from the beginning again
     input_file.seek(0) 
@@ -57,6 +58,7 @@ def transform_csv_with_ids(input_csv_content, tag_name_to_id_mapping):
                 tag_value = tag_values[i]
                 if tag_value.strip() and tag_name in tag_name_to_id_mapping:
                     tag_id = tag_name_to_id_mapping[tag_name]
+                    # Append the data in the new order
                     output_rows.append([tag_id, tag_name, tag_value, metadata_value])
 
     output_file = io.StringIO()
@@ -124,4 +126,25 @@ def main_notebook_runner():
 
     # --- Transform Data ---
     print("\nStarting CSV transformation...")
-    transformed_data = transform_csv_with_
+    transformed_data = transform_csv_with_ids(input_csv_content, tag_name_to_id_mapping)
+
+    # --- Display and Save Output ---
+    if transformed_data:
+        # Print a preview of the first few lines
+        print("\n--- Transformation Successful ---")
+        preview = '\n'.join(transformed_data.splitlines()[:10])
+        print("Preview of the first 10 lines of output:\n")
+        print(preview)
+
+        # Save the result to a file
+        output_filename = 'transformed_output.csv'
+        with open(output_filename, 'w', encoding='utf-8', newline='') as f:
+            f.write(transformed_data)
+        
+        print(f"\nOutput successfully saved as '{output_filename}'.")
+        print("You can find and download this file from the file browser on the left.")
+    else:
+        print("\nTransformation failed. Please check the error messages above.", file=sys.stderr)
+
+# To run this in your notebook, copy the following line into a new cell and execute it:
+# main_notebook_runner()

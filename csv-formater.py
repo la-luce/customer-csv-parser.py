@@ -1,9 +1,9 @@
 import csv
 import io
-import argparse
 import json
 import sys
 
+# This is the core transformation function. It remains the same.
 def transform_csv_with_ids(input_csv_content, tag_name_to_id_mapping):
     """
     Transforms CSV data into a four-column format for readability:
@@ -15,130 +15,113 @@ def transform_csv_with_ids(input_csv_content, tag_name_to_id_mapping):
                                        (from CSV headers) to their unique IDs.
 
     Returns:
-        str: A string containing the transformed data in CSV format, or an
-             error message if a mapping is missing.
+        str: A string containing the transformed data in CSV format, or None if an error occurs.
     """
     # Use io.StringIO to treat the string input_csv_content as a file
     input_file = io.StringIO(input_csv_content)
     reader = csv.reader(input_file)
 
-    # Read the header row to get the tag names
     try:
-        # The first column header is our metadata column (e.g., 'project_number')
-        metadata_header = next(reader)[0] 
-        # Rewind the file to process headers again with the data
-        input_file.seek(0)
-        # Get all tag name headers, skipping the first column
-        tag_name_headers = next(reader)[1:]
+        tag_name_headers = next(reader)[1:] # Get all tag name headers, skipping the first column
     except StopIteration:
-        return "Error: CSV file is empty or has no headers."
+        print("Error: CSV file is empty or has no headers.", file=sys.stderr)
+        return None
 
     # Validate that all headers from the CSV have a corresponding ID in the mapping
     missing_keys = [header for header in tag_name_headers if header.strip() and header not in tag_name_to_id_mapping]
     if missing_keys:
-        # Using sys.stderr to report errors is a good practice for command-line tools
-        sys.stderr.write(f"Error: Missing ID mapping for the following Tag Names: {', '.join(missing_keys)}\n")
+        print(f"Error: Missing ID mapping for the following Tag Names: {', '.join(missing_keys)}", file=sys.stderr)
         return None
 
     output_rows = []
-    # Add the header for the new output format, with 'metadata' as the last column
     output_rows.append(['tagkey_id', 'tagkey_name', 'tagvalue', 'metadata'])
 
-    # Process each data row from the input CSV
-    # We already skipped the header, so the reader is at the first data row
-    input_file.seek(0) # Rewind to read from the beginning
-    next(reader) # Skip header row again
+    # Rewind the file-like object to read from the beginning again
+    input_file.seek(0) 
+    next(reader) # Skip header row
     
     for row in reader:
-        if not row or not any(field.strip() for field in row):  # Skip empty or all-whitespace rows
+        if not row or not any(field.strip() for field in row):
             continue
-
         if len(row) < 1:
             continue
             
         metadata_value = row[0]
-        if not metadata_value.strip(): # Skip if metadata value (project_number) is missing
+        if not metadata_value.strip():
             continue
             
-        tag_values = row[1:] # Get all values corresponding to the tag headers
+        tag_values = row[1:]
 
-        # Iterate through the headers and their corresponding values
         for i, tag_name in enumerate(tag_name_headers):
             if i < len(tag_values):
                 tag_value = tag_values[i]
-                # Check if the tag_name actually exists in our mapping before proceeding
                 if tag_value.strip() and tag_name in tag_name_to_id_mapping:
-                    # Look up the tag ID from the mapping dictionary
                     tag_id = tag_name_to_id_mapping[tag_name]
-                    # Append the new four-column row with metadata (project_number) at the end
                     output_rows.append([tag_id, tag_name, tag_value, metadata_value])
 
-    # Convert the list of output rows back to a CSV formatted string
     output_file = io.StringIO()
     writer = csv.writer(output_file)
     writer.writerows(output_rows)
     
     return output_file.getvalue()
 
-def main():
+
+# --- How to run in Google Colab / Jupyter Notebook ---
+#
+# Instead of using the command line, you will run the code below in a notebook cell.
+# This code handles uploading your files, processing them, and making the result available
+# for download.
+#
+# Steps:
+# 1. Copy the code from the 'main_notebook_runner' function into a new Colab cell.
+# 2. Run the cell.
+# 3. You will be prompted to upload two files:
+#    - First, your input CSV (e.g., 'Mage Tagging Sheet - Sheet1.csv').
+#    - Second, your mapping JSON file (e.g., 'tag_mappings.json').
+# 4. The script will process the files and save the output as 'transformed_output.csv'.
+# 5. This output file will appear in the Colab file browser (the folder icon on the left),
+#    from where you can download it.
+
+def main_notebook_runner():
     """
-    Main function to run the script from the command line.
-    Parses arguments, reads files, calls the transformation function, and writes the output.
+    This function replaces the command-line interface for use in a notebook.
     """
-    parser = argparse.ArgumentParser(
-        description="Transforms a CSV of project tags into a long format suitable for ingestion.",
-        formatter_class=argparse.RawTextHelpFormatter
-    )
-    parser.add_argument(
-        'input_csv',
-        help="Path to the input CSV file."
-    )
-    parser.add_argument(
-        'mapping_json',
-        help="Path to the JSON file containing the mapping of tag names to tag IDs."
-    )
-    parser.add_argument(
-        'output_csv',
-        help="Path for the output CSV file."
-    )
-
-    args = parser.parse_args()
-
-    # --- Read Input Files ---
     try:
-        with open(args.input_csv, 'r', encoding='utf-8') as f:
-            input_csv_content = f.read()
-    except FileNotFoundError:
-        sys.stderr.write(f"Error: Input file not found at '{args.input_csv}'\n")
-        sys.exit(1)
+        from google.colab import files
+        print("Please upload your input CSV file:")
+        uploaded_csv = files.upload()
+        
+        if not uploaded_csv:
+            print("No CSV file was uploaded. Aborting.")
+            return
 
-    try:
-        with open(args.mapping_json, 'r', encoding='utf-8') as f:
-            tag_name_to_id_mapping = json.load(f)
-    except FileNotFoundError:
-        sys.stderr.write(f"Error: Mapping file not found at '{args.mapping_json}'\n")
-        sys.exit(1)
-    except json.JSONDecodeError:
-        sys.stderr.write(f"Error: Could not parse the JSON mapping file. Please check its format.\n")
-        sys.exit(1)
+        # Get the content of the first uploaded CSV file
+        input_csv_filename = list(uploaded_csv.keys())[0]
+        input_csv_content = uploaded_csv[input_csv_filename].decode('utf-8')
+        print(f"Successfully uploaded '{input_csv_filename}'.")
+
+        print("\nPlease upload your tag mapping JSON file:")
+        uploaded_json = files.upload()
+
+        if not uploaded_json:
+            print("No JSON file was uploaded. Aborting.")
+            return
+            
+        # Get the content of the first uploaded JSON file
+        mapping_json_filename = list(uploaded_json.keys())[0]
+        tag_name_to_id_mapping = json.loads(uploaded_json[mapping_json_filename].decode('utf-8'))
+        print(f"Successfully uploaded and parsed '{mapping_json_filename}'.")
+
+    except ImportError:
+        # Fallback for environments other than Colab (like a local Jupyter notebook)
+        print("Not in a Google Colab environment. Please define file contents manually.")
+        # In a local Jupyter notebook, you would load files like this:
+        # with open('path/to/your/file.csv', 'r') as f:
+        #     input_csv_content = f.read()
+        # with open('path/to/your/mapping.json', 'r') as f:
+        #     tag_name_to_id_mapping = json.load(f)
+        return # Stop execution if not in Colab for this example
 
     # --- Transform Data ---
-    print("Starting CSV transformation...")
-    transformed_data = transform_csv_with_ids(input_csv_content, tag_name_to_id_mapping)
-    
-    # --- Write Output File ---
-    if transformed_data:
-        try:
-            with open(args.output_csv, 'w', encoding='utf-8', newline='') as f:
-                f.write(transformed_data)
-            print(f"Transformation complete. Output written to '{args.output_csv}'")
-        except IOError as e:
-            sys.stderr.write(f"Error writing to output file '{args.output_csv}': {e}\n")
-            sys.exit(1)
-    else:
-        sys.stderr.write("Transformation failed. Please check the error messages above.\n")
-        sys.exit(1)
-
-# This block makes the script executable from the command line
-if __name__ == "__main__":
-    main()
+    print("\nStarting CSV transformation...")
+    transformed_data = transform_csv_with_
